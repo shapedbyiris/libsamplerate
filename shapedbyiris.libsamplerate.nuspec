@@ -1,0 +1,24 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+  <metadata>
+    <id>shapedbyiris.libsamplerate</id>
+    <version>$version$</version>
+    <description>An audio Sample Rate Conversion library</description>
+    <authors>libsamplerate</authors>
+    <projectUrl>https://github.com/shapedbyiris/libsamplerate</projectUrl>
+    <license type="expression">BSD-2-Clause</license>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <tags>native log libsamplerate audio c++ cpp</tags>
+    <repository type="git" url="https://github.com/shapedbyiris/libsamplerate" />
+    <dependencies>
+      <group targetFramework="native0.0" />
+    </dependencies>
+  </metadata>
+  <files>
+    <file src="include/samplerate.h"                target="/lib/native/include/libsamplerate" />
+    <file src="build/src/Release/samplerate.lib"    target="/lib/native/x64-Release" />
+    <file src="build/src/Debug/samplerate.lib"      target="/lib/native/x64-Debug" />
+    <file src="build/src/Debug/samplerate.pdb"      target="/lib/native/x64-Debug" />
+    <file src="shapedbyiris.libsamplerate.props"    target="/build/native" />
+  </files>
+</package>
