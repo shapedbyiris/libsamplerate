@@ -807,6 +807,9 @@ sinc_quad_vari_process (SRC_STATE *state, SRC_DATA *data)
 		float_increment = filter->index_inc * (src_ratio < 1.0 ? src_ratio : 1.0) ;
 		increment = double_to_fp (float_increment) ;
 
+		// FIX EXCEPTION_INT_DIVIDE_BY_ZERO
+		if (increment == 0) increment = 1;
+
 		start_filter_index = double_to_fp (input_index * float_increment) ;
 
 		calc_output_quad (filter, state->channels, increment, start_filter_index, float_increment / filter->index_inc, data->data_out + filter->out_gen) ;
