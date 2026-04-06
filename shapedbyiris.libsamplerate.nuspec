@@ -16,7 +16,7 @@
   </metadata>
 
   <files>
-    <file src="include/*.h" target="lib/native/include" />
+    <file src="include/samplerate.h" target="lib/native/include/libsamplerate" />
 
     <file src="output/Windows/x64-Release/samplerate.lib" target="lib/native/x64-Release" />
     <file src="output/Windows/x64-Debug/samplerate.lib" target="lib/native/x64-Debug" />
