@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <PropertyGroup>
+    <LibSampleratePackageRoot>$(MSBuildThisFileDirectory)..\..\lib\native\</LibSampleratePackageRoot>
+    <LibSamplerateArch Condition="'$(Platform)' == 'x64'">x64</LibSamplerateArch>
+    <LibSamplerateArch Condition="'$(Platform)' == 'ARM64'">ARM64</LibSamplerateArch>
+    <LibSamplerateLibDir>$(LibSampleratePackageRoot)$(LibSamplerateArch)-$(Configuration)</LibSamplerateLibDir>
+  </PropertyGroup>
+
+  <Target Name="LibSamplerateValidatePlatform" BeforeTargets="Link"
+          Condition="'$(LibSamplerateArch)' == ''">
+    <Error Text="shapedbyiris.libsamplerate: unsupported Platform '$(Platform)'. Supported platforms: x64, ARM64." />
+  </Target>
+
+  <Target Name="LibSamplerateValidateLibs" BeforeTargets="Link">
+    <Error Condition="!Exists('$(LibSamplerateLibDir)\samplerate.lib')"
+           Text="shapedbyiris.libsamplerate: missing native library for $(Platform) / $(Configuration) at $(LibSamplerateLibDir)." />
+  </Target>
+
+  <ItemDefinitionGroup>
+    <Link>
+      <AdditionalLibraryDirectories>$(LibSamplerateLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>samplerate.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+
+</Project>

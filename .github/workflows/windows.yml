@@ -10,26 +10,151 @@ jobs:
   build:
     runs-on: windows-2022
 
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, ARM64]
+        config: [Debug, Release]
+
     steps:
-    - name: Checkout
-      uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - name: Configure CMake
-      run: cmake -B build -G "Visual Studio 17 2022" -A x64 -DBUILD_TESTING=OFF -DLIBSAMPLERATE_EXAMPLES=OFF -DCMAKE_MSVC_RUNTIME_LIBRARY="MultiThreaded$<$<CONFIG:Debug>:Debug>"
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v2
+        with:
+          msbuild-architecture: x64
+          vs-version: '17.14'
 
-    - name: Build Release
-      run: cmake --build build --config Release
+      - name: Configure CMake
+        run: >
+          cmake
+          -B build/${{ matrix.arch }}
+          -G "Visual Studio 17 2022"
+          -A ${{ matrix.arch }}
+          -DBUILD_TESTING=OFF
+          -DLIBSAMPLERATE_EXAMPLES=OFF
+          -DCMAKE_MSVC_RUNTIME_LIBRARY="MultiThreaded$<$<CONFIG:Debug>:Debug>"
 
-    - name: Build Debug
-      run: cmake --build build --config Debug
+      - name: Build
+        run: cmake --build build/${{ matrix.arch }} --config ${{ matrix.config }}
 
-    - name: Pack NuGet
-      run: nuget pack shapedbyiris.libsamplerate.nuspec -p version=$((Get-Date).tostring("yyyy.MMdd.HHmm"))
+      - name: Stage package files
+        shell: pwsh
+        run: |
+          $outDir = "artifacts/${{ matrix.arch }}-${{ matrix.config }}"
+          New-Item -ItemType Directory -Force $outDir | Out-Null
 
-    - name: Publish NuGet
-      if: github.event_name != 'pull_request'
-      run: |
-        nuget sources Add -Name github -Source https://nuget.pkg.github.com/${{github.repository_owner}}/index.json -Username ${{github.repository_owner}} -Password ${{github.token}}
-        nuget push *.nupkg -Source github -SkipDuplicate -ApiKey ${{github.token}}
+          $lib = Get-ChildItem "build/${{ matrix.arch }}" -Recurse -Filter samplerate.lib |
+            Where-Object { $_.FullName -match "\\${{ matrix.config }}\\" } |
+            Select-Object -First 1
+
+          if (-not $lib)
+          {
+              throw "samplerate.lib not found for ${{ matrix.arch }} / ${{ matrix.config }}"
+          }
+
+          Copy-Item $lib.FullName $outDir -Force
+
+          $pdb = Get-ChildItem "build/${{ matrix.arch }}" -Recurse -Filter samplerate.pdb -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match "\\${{ matrix.config }}\\" } |
+            Select-Object -First 1
+
+          if ($pdb)
+          {
+              Copy-Item $pdb.FullName $outDir -Force
+          }
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.arch }}-${{ matrix.config }}
+          path: artifacts/${{ matrix.arch }}-${{ matrix.config }}
+
+  pack:
+    needs: build
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: downloaded
+
+      - name: Reassemble output tree
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force output/Windows/x64-Debug     | Out-Null
+          New-Item -ItemType Directory -Force output/Windows/x64-Release   | Out-Null
+          New-Item -ItemType Directory -Force output/Windows/ARM64-Debug   | Out-Null
+          New-Item -ItemType Directory -Force output/Windows/ARM64-Release | Out-Null
+
+          Copy-Item "downloaded/x64-Debug/samplerate.lib"     "output/Windows/x64-Debug/"     -Force
+          Copy-Item "downloaded/x64-Release/samplerate.lib"   "output/Windows/x64-Release/"   -Force
+          Copy-Item "downloaded/ARM64-Debug/samplerate.lib"   "output/Windows/ARM64-Debug/"   -Force
+          Copy-Item "downloaded/ARM64-Release/samplerate.lib" "output/Windows/ARM64-Release/" -Force
+
+          if (Test-Path "downloaded/x64-Debug/samplerate.pdb")
+          {
+              Copy-Item "downloaded/x64-Debug/samplerate.pdb" "output/Windows/x64-Debug/" -Force
+          }
+
+          if (Test-Path "downloaded/x64-Release/samplerate.pdb")
+          {
+              Copy-Item "downloaded/x64-Release/samplerate.pdb" "output/Windows/x64-Release/" -Force
+          }
+
+          if (Test-Path "downloaded/ARM64-Debug/samplerate.pdb")
+          {
+              Copy-Item "downloaded/ARM64-Debug/samplerate.pdb" "output/Windows/ARM64-Debug/" -Force
+          }
+
+          if (Test-Path "downloaded/ARM64-Release/samplerate.pdb")
+          {
+              Copy-Item "downloaded/ARM64-Release/samplerate.pdb" "output/Windows/ARM64-Release/" -Force
+          }
+
+      - name: Pack NuGet
+        shell: pwsh
+        run: |
+          $version = Get-Date -Format "yyyy.MMdd.HHmm"
+          nuget pack shapedbyiris.libsamplerate.nuspec -Properties "version=$version"
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-package
+          path: "*.nupkg"
+
+  publish:
+    if: github.event_name != 'pull_request'
+    needs: pack
+    runs-on: windows-2022
+
+    steps:
+      - name: Download package
+        uses: actions/download-artifact@v4
+        with:
+          name: nuget-package
+          path: pkg
+
+      - name: Add GitHub Packages source
+        shell: pwsh
+        run: |
+          nuget sources Add `
+            -Name github `
+            -Source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" `
+            -Username "${{ github.repository_owner }}" `
+            -Password "${{ github.token }}"
+
+      - name: Push package
+        shell: pwsh
+        run: |
+          Get-ChildItem pkg -Filter *.nupkg | ForEach-Object {
+              nuget push $_.FullName -Source github -SkipDuplicate -ApiKey "${{ github.token }}"
+          }
