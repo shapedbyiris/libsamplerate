@@ -65,8 +65,9 @@ jobs:
               throw "samplerate.pdb not found for ${{ matrix.arch }} / ${{ matrix.config }}"
           }
 
-    Copy-Item $lib.FullName $outDir -Force
-    Copy-Item $pdb.FullName $outDir -Force
+          Copy-Item $lib.FullName $outDir -Force
+          Copy-Item $pdb.FullName $outDir -Force
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
