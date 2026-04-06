@@ -21,6 +21,13 @@ project(libsamplerate VERSION 0.2.2 LANGUAGES C)
 
 # Configuration
 
+if(MSVC)
+  add_compile_options(
+    "$<$<CONFIG:Debug>:/Zi>"
+    "$<$<CONFIG:Release>:/Zi>"
+  )
+endif()
+
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
   set(IS_ROOT_PROJECT ON)
 else()
